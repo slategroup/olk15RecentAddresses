@@ -12,8 +12,8 @@ class Parser(object):
     start_of_email_index = 66  # 66th byte is the 132 character
     end_of_email = None
 
-    def __init__(self, filename):
-
+    def __init__(self, filename, debug=False):
+        self.debug = debug
         self.filename = filename
 
     def get_email_addresses(self):
@@ -26,13 +26,13 @@ class Parser(object):
     def grouper(self, n, iterable, fillvalue=None):
         "grouper(8, ['AB','CD','FG'], 'x') --> ABC DEF Gxx"
         args = [iter(iterable)] * n
-        return itertools.izip_longest(*args, fillvalue=fillvalue)
+        return itertools.zip_longest(*args, fillvalue=fillvalue)
 
 
     def go(self):
 
         with open(self.filename, 'rb') as fp:
-            hex_list = ["{:02x}".format(ord(c)) for c in fp.read()]
+            hex_list = ["{:02x}".format(c) for c in fp.read()]
 
             email_indeces = [self.start_of_email_index]
             first_index_byte_index = 0
@@ -56,7 +56,7 @@ class Parser(object):
                 try:
                     int_val = struct.unpack("<h", hex_rep)[0]
                 except Exception as e:
-                    print "Error processing group %s: %s" % (hex_rep, e)
+                    print("Error processing group %s: %s" % (hex_rep, e, ))
                     int_val = -1
                     continue
 
@@ -72,15 +72,19 @@ class Parser(object):
             # to self.end_of_email
             emails_hex = []
             for i, index in enumerate(email_indeces):
-                print i
-                print index
+                if self.debug:
+                    print(i)
+                    print(index)
                 if i == len(email_indeces) - 1:
                     break
                 emails_hex.append(hex_list[index:email_indeces[i+1]])
 
-            emails = [binascii.unhexlify(''.join(item)) for item in emails_hex]
+            emails = [binascii.unhexlify(''.join(item)).decode("utf-8") for item in emails_hex]
 
-            print emails
+            if self.debug:
+                print(emails)
+
+            return emails
 
             # email_map_start_index = ascii_file.find(
             #     self.email_index_separator,
@@ -121,7 +125,3 @@ class Parser(object):
 
             # split on the first sign of 4 null bytes in a row,
             # which indicates the start of the index of emails
-
-
-
-
