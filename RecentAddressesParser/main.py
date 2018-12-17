@@ -6,4 +6,4 @@ parser.add_argument('filename', type=str, help="Path to the olk15RecentAddresses
 args = parser.parse_args()
 parser = Parser(args.filename)
 emails = parser.go()
-print("\n".join(emails))
+# print("\n".join(emails))

@@ -16,17 +16,75 @@ class Parser(object):
         self.debug = debug
         self.filename = filename
 
-    def get_email_addresses(self):
-
-        # initial address start at byte
-
-        return email_addresses
-
     # https: // docs.python.org / 3.1 / library / itertools.html  # recipes
     def grouper(self, n, iterable, fillvalue=None):
         "grouper(8, ['AB','CD','FG'], 'x') --> ABC DEF Gxx"
         args = [iter(iterable)] * n
         return itertools.zip_longest(*args, fillvalue=fillvalue)
+
+    def decode_segment(self, hex_list, offset, parse_strings = True):
+        indicies = [offset]
+        first_index_byte_index = 0
+        end_index_byte_index = 0
+        strings = None
+
+        for i, byte in enumerate(hex_list):
+            if i < offset:
+                continue
+            # Assume that the first sequence of two null bytes indicates
+            # the end of email
+            if first_index_byte_index == 0 and byte == '00' and hex_list[i+1] == "00":
+                first_index_byte_index = i+2
+
+        print(hex(first_index_byte_index))
+
+        four_byte_groups = self.grouper(4, hex_list[first_index_byte_index:],'00')
+        last_offset = 0
+        baseline = offset
+
+        for i, group in enumerate(four_byte_groups):
+            if i > 50:
+                break
+            index = None
+            if not parse_strings:
+                hex_str = ''.join(group[2:])
+                offset = int(hex_str, 16)
+                if offset < last_offset:
+                    print("Break")
+                    baseline += last_offset
+                    last_offset = 0
+                start = baseline + last_offset
+                end = baseline + offset
+                last_offset = offset
+                print(i, hex(start), hex(end))
+                index = end
+            else:
+                hex_rep = binascii.unhexlify(''.join(group[2:]))
+                try:
+                    index = baseline + struct.unpack("<h", hex_rep)[0]
+                except Exception as e:
+                    print("Error processing group %s: %s" % (hex_rep, e, ))
+                    index = -1
+                    continue
+
+            indicies.append(index)
+
+            if index >= first_index_byte_index-2:
+                end_index_byte_index = first_index_byte_index + (i * 4) + 6
+                break
+
+        if parse_strings:
+            strings_hex = []
+            for i, index in enumerate(indicies):
+                if self.debug:
+                    print(i)
+                    print(index)
+                if i == len(indicies) - 1:
+                    break
+                strings_hex.append(hex_list[index:indicies[i+1]])
+            strings = [binascii.unhexlify(''.join(item)).decode("utf-8") for item in strings_hex]
+
+        return (strings, end_index_byte_index)
 
 
     def go(self):
@@ -34,57 +92,65 @@ class Parser(object):
         with open(self.filename, 'rb') as fp:
             hex_list = ["{:02x}".format(c) for c in fp.read()]
 
-            email_indeces = [self.start_of_email_index]
-            first_index_byte_index = 0
+            # email_indeces = [self.start_of_email_index]
+            # first_index_byte_index = 0
 
-            for i, byte in enumerate(hex_list):
-                if i < self.start_of_email_index:
-                    continue
-                # Assume that the first sequence of two null bytes indicates
-                # the end of email
-                if first_index_byte_index == 0 and byte == '00' and hex_list[i+1] == "00":
-                    self.end_of_email_index = first_index_byte_index
-                    first_index_byte_index = i+2
+            # for i, byte in enumerate(hex_list):
+            #     if i < self.start_of_email_index:
+            #         continue
+            #     # Assume that the first sequence of two null bytes indicates
+            #     # the end of email
+            #     if first_index_byte_index == 0 and byte == '00' and hex_list[i+1] == "00":
+            #         self.end_of_email_index = first_index_byte_index
+            #         first_index_byte_index = i+2
 
             # for each group of four, get the second two bytes and int them
-            four_byte_groups = self.grouper(
-                4, hex_list[first_index_byte_index:],'00')
+            # four_byte_groups = self.grouper(4, hex_list[first_index_byte_index:],'00')
 
-            for group in four_byte_groups:
-                # for each group of four, get the second two bytes and int them
-                hex_rep = binascii.unhexlify(''.join(group[2:]))
-                try:
-                    int_val = struct.unpack("<h", hex_rep)[0]
-                except Exception as e:
-                    print("Error processing group %s: %s" % (hex_rep, e, ))
-                    int_val = -1
-                    continue
+            # for group in four_byte_groups:
+            #     # for each group of four, get the second two bytes and int them
+            #     hex_rep = binascii.unhexlify(''.join(group[2:]))
+            #     try:
+            #         int_val = struct.unpack("<h", hex_rep)[0]
+            #     except Exception as e:
+            #         print("Error processing group %s: %s" % (hex_rep, e, ))
+            #         int_val = -1
+            #         continue
 
-                # their value is the next thing to add to email_indeces
-                email_indeces.append(self.start_of_email_index + int_val)
+            #     # their value is the next thing to add to email_indeces
+            #     email_indeces.append(self.start_of_email_index + int_val)
 
-                # once their value is equal to or greater than first_index_byte_index
-                # stop, processing
-                if int_val+self.start_of_email_index >= first_index_byte_index-2:
-                    break
+            #     # once their value is equal to or greater than first_index_byte_index
+            #     # stop, processing
+            #     if int_val+self.start_of_email_index >= first_index_byte_index-2:
+            #         break
 
             # We now know that our email address go from byte self.start_of_email
             # to self.end_of_email
-            emails_hex = []
-            for i, index in enumerate(email_indeces):
-                if self.debug:
-                    print(i)
-                    print(index)
-                if i == len(email_indeces) - 1:
-                    break
-                emails_hex.append(hex_list[index:email_indeces[i+1]])
+            # emails_hex = []
+            # for i, index in enumerate(email_indeces):
+            #     if self.debug:
+            #         print(i)
+            #         print(index)
+            #     if i == len(email_indeces) - 1:
+            #         break
+            #     emails_hex.append(hex_list[index:email_indeces[i+1]])
 
-            emails = [binascii.unhexlify(''.join(item)).decode("utf-8") for item in emails_hex]
+            # emails = [binascii.unhexlify(''.join(item)).decode("utf-8") for item in emails_hex]
 
-            if self.debug:
-                print(emails)
+            # (emails, middle_index) = self.decode_segment(hex_list, self.start_of_email_index)
 
-            return emails
+            # print(hex(middle_index))
+
+            (_, end_index) = self.decode_segment(hex_list, int("0x81e4", 16), False)
+
+            print(hex(end_index))
+
+            # if self.debug:
+            #     print(emails)
+
+            # return emails
+            return None
 
             # email_map_start_index = ascii_file.find(
             #     self.email_index_separator,
