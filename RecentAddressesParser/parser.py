@@ -28,7 +28,6 @@ class Parser(object):
         args = [iter(iterable)] * n
         return itertools.izip_longest(*args, fillvalue=fillvalue)
 
-
     def go(self):
 
         with open(self.filename, 'rb') as fp:
@@ -48,7 +47,7 @@ class Parser(object):
 
             # for each group of four, get the second two bytes and int them
             four_byte_groups = self.grouper(
-                4, hex_list[first_index_byte_index:],'00')
+                4, hex_list[first_index_byte_index:], '00')
 
             for group in four_byte_groups:
                 # for each group of four, get the second two bytes and int them
@@ -80,7 +79,8 @@ class Parser(object):
 
             emails = [binascii.unhexlify(''.join(item)) for item in emails_hex]
 
-            print emails
+            for email in emails:
+                print email
 
             # email_map_start_index = ascii_file.find(
             #     self.email_index_separator,
@@ -103,9 +103,6 @@ class Parser(object):
             #         email_indeces.append(two_byte)
             #
 
-
-
-
             # map_index_ascii = ascii_file_sans_header[email_index_start:].split('0000')
             # for ascii_rep in map_index_ascii:
             #     try:
@@ -114,14 +111,7 @@ class Parser(object):
             #     except ValueError, e:
             #         print e
 
-
             # Just keep getting indeces until you hit the max_index_start
-
-
 
             # split on the first sign of 4 null bytes in a row,
             # which indicates the start of the index of emails
-
-
-
-
